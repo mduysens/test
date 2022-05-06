@@ -1,0 +1,18 @@
+version: '3.3'
+services:
+    prometheus:
+        ports:
+            - '9090:9090'
+        volumes:
+            - './course/labs/1-metrics/config:/etc/prometheus'
+        image: prom/prometheus
+        container_name: prometheus
+    simple-container:
+        build:
+            context: ./dotnet-webapp
+            dockerfile: ./Dockerfile
+        container_name: simple-instance
+        ports:
+            - '9006:80'
+            - '9464:9464'
+        image: simple-container

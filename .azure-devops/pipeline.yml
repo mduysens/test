@@ -1,0 +1,67 @@
+trigger:
+- master
+
+parameters:
+- name: containerRegistry
+  displayName: The DevOps ServiceConnection to some container registry
+  type: string
+  default: DockerSis2
+- name: readyUrl
+  displayName: The url we are posting to when finished
+  type: string
+  default: https://webhook.site/8741704d-b2a4-4fab-b47b-1086afec814f # Nog een comment toevoegen
+
+variables:
+  name: test
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: 'Build'
+  dependsOn: []
+  jobs:
+  - job: Build
+    continueOnError: false
+    steps:
+    - pwsh: Write-Host "##vso[task.setvariable variable=startTime]$(Get-Date)"
+      displayName: Set new variable value
+
+    - task: Docker@2
+      displayName: Login to ACR
+      inputs:
+        command: 'login'
+        containerRegistry: '${{parameters.containerRegistry}}'
+
+    - task: Docker@2
+      displayName: 'Build image'
+      inputs:
+        command: 'build'
+        repository: 'dotnet-webapp-race'
+        Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        tags: |
+          latest
+          $(Build.BuildNumber)
+    
+    - task: Docker@2
+      displayName: 'Push image'
+      inputs:
+        command: 'push'
+        repository: 'dotnet-webapp-race'
+        containerRegistry: '${{parameters.containerRegistry}}'
+        tags: |
+          latest
+          $(Build.BuildNumber)
+
+    - pwsh: |
+        $startTimeParsed = [DateTime]'$(startTime)'
+        $endTimeParsed = Get-Date
+        $totalSeconds = ($endTimeParsed-$startTimeParsed).TotalSeconds
+        $body = @{
+          starttime = $startTimeParsed
+          endtime = $endTimeParsed
+          totalSeconds = $totalSeconds
+        }
+
+        Invoke-RestMethod -Method 'Post' -Uri '${{parameters.readyUrl}}' -Body $body
